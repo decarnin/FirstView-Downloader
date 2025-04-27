@@ -30,7 +30,6 @@ def download_image(url: str, download_path: str, file_name: str):
         print(f'Error downloading image: {e}')
 
 def get_images(driver: webdriver.Chrome, url: str, download_path: str, total_images: int):
-    driver.get(url)
     wait = WebDriverWait(driver, 10)
     current_image = 1
 
@@ -58,6 +57,7 @@ def get_images(driver: webdriver.Chrome, url: str, download_path: str, total_ima
 
         except Exception as e:
             print(f'Error fetching image: {e}')
+            current_image += 1
 
 def main():
     url_list: list[str] = []
