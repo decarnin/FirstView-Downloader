@@ -1,4 +1,6 @@
-selenium
-webdriver-manager
-requests
+aiohttp
+playwright
 Pillow
+requests
+beautifulsoup4
+PySide6
