@@ -47,7 +47,7 @@ async def get_images(session: aiohttp.ClientSession, page: Page, download_path: 
     middle = first_runway[len(prefix): -len(suffix)]
 
     image_urls : list[str] = []
-    for i, thumbnail in enumerate(thumbnail_list):
+    for thumbnail in thumbnail_list:
         thumbnail_url = urljoin(BASE, thumbnail)
         download_url = prefix + middle + thumbnail_url[-len(suffix):]
         image_urls.append(download_url)
@@ -66,8 +66,8 @@ async def main() -> None:
             for line in file:
                 url_list.append(line.strip())
 
-        downloads: Path = Path('Downloads')
-        downloads.mkdir(exist_ok = True)
+        firstview: Path = Path.home() / 'Downloads' / 'FirstView'
+        firstview.mkdir(exist_ok = True)
     
         timeout = aiohttp.ClientTimeout(total = 60)
         connector = aiohttp.TCPConnector(limit = 100, limit_per_host = 10, force_close = True)
@@ -92,7 +92,7 @@ async def main() -> None:
                 raw_total_images = await page.locator('.info').text_content()
                 total_images = int(raw_total_images.split(' ')[0])
 
-                runway_directory: Path = downloads / designer / gender/ season / album
+                runway_directory: Path = firstview / designer / gender/ season / album
                 runway_directory.mkdir(parents = True, exist_ok = True)
                 
                 print(f'Downloading {total_images} images from {designer} {gender} {season} {album}')
