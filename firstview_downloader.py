@@ -1,109 +1,104 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.action_chains import ActionChains
-from webdriver_manager.chrome import ChromeDriverManager
+import aiohttp
+import asyncio
+from playwright.async_api import async_playwright
+from playwright.async_api import Page
+from pathlib import Path
+from urllib.parse import urljoin
 import os
-import requests
 import io
 from PIL import Image
 
-def setup_driver():
-    options = Options()
-    options.add_argument('--headless')
-    options.add_argument('--start-maximized')
-    driver = webdriver.Chrome(service = ChromeService(ChromeDriverManager().install()), options = options)
-    return driver
-
-def download_image(url: str, download_path: str, file_name: str):
+async def download_image(session: aiohttp.ClientSession, url: str, download_path: Path, file_name: str) -> None:
     try:
-        image_content = requests.get(url).content
-        image_file = io.BytesIO(image_content)
-        image = Image.open(image_file)
-        file_path = os.path.join(download_path, file_name)
-        with open(file_path, 'wb') as file:
-            image.save(file, format = 'PNG')
+        async with session.get(url) as response:
+            response.raise_for_status() # Checks if the response is in the error range (4xx or 5xx) and raises an exception
+            data = await response.read()
+            image = Image.open(io.BytesIO(data))
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+            image.save(download_path / file_name, format = 'JPEG')
     except Exception as e:
-        print(f'Error downloading image: {e}')
+        print(f'Error downloading image {url}: {e}')
 
-def get_images(driver: webdriver.Chrome, url: str, download_path: str, total_images: int):
-    wait = WebDriverWait(driver, 10)
-    current_image = 1
+async def get_thumbnails(page: Page, total_images: int) -> list[str]:
+    thumbnail_list: list[str] = []
 
-    thumbnail = driver.find_elements(By.CLASS_NAME, 'picture')[0]
-    try:
-        wait.until(EC.element_to_be_clickable(thumbnail))
-        ActionChains(driver).move_to_element(thumbnail).click().perform()
-    except Exception as e:
-        print(f'Error clicking thumbnail: {e}')
+    for i in range(total_images):
+        thumbnail = page.locator('.picture').nth(i)
+        thumbnail_url = await thumbnail.get_attribute('src')
+        thumbnail_list.append(thumbnail_url)
+        await thumbnail.scroll_into_view_if_needed()
 
-    while current_image < total_images + 1:
-        try:
-            runway_image = wait.until(
-                EC.presence_of_element_located((By.XPATH, "//img[contains(@alt, 'ImageID:')]"))
-            )
+    return thumbnail_list
 
-            image_url = runway_image.get_attribute('src')
-            download_image(image_url, download_path, f'{current_image}.png')
+async def get_images(session: aiohttp.ClientSession, page: Page, download_path: Path, total_images: int) -> None:
+    BASE = 'https://www.firstview.com'
+    download_path.mkdir(parents = True, exist_ok = True)
+    thumbnail_list = await get_thumbnails(page, total_images)
+    first_thumbnail = urljoin(BASE, thumbnail_list[0])
 
-            current_image += 1
-            next_button = wait.until(
-                EC.element_to_be_clickable((By.LINK_TEXT, 'next'))
-            )
-            next_button.click()
+    await page.locator('.picture').first.click()
+    runway_image = page.locator('img[alt*="ImageID:"]')
+    await runway_image.wait_for()
+    first_runway = urljoin(BASE, await runway_image.get_attribute('src'))
 
-        except Exception as e:
-            print(f'Error fetching image: {e}')
-            current_image += 1
+    prefix = os.path.commonprefix([first_thumbnail, first_runway])
+    suffix = os.path.commonprefix([first_thumbnail[::-1], first_runway[::-1]])[::-1]
+    middle = first_runway[len(prefix): -len(suffix)]
 
-def main():
-    url_list: list[str] = []
-    with open('config.txt') as file:
-        for line in file:
-            url_list.append(line.strip())
+    image_urls : list[str] = []
+    for i, thumbnail in enumerate(thumbnail_list):
+        thumbnail_url = urljoin(BASE, thumbnail)
+        download_url = prefix + middle + thumbnail_url[-len(suffix):]
+        image_urls.append(download_url)
 
-    driver = setup_driver()
-    wait = WebDriverWait(driver, 10)
+    tasks = [download_image(session, url, download_path, f'{i}.jpg') for i, url in enumerate(image_urls, start = 1)]
+    await asyncio.gather(*tasks)
 
-    if not os.path.exists('Downloads'):
-        os.makedirs('Downloads')
-    os.chdir('Downloads')
+async def main() -> None:
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless = True)
+        context = await browser.new_context()
+        page = await context.new_page()
 
-    for url in url_list:
-        driver.get(url)
+        url_list: list[str] = []
+        with open('config.txt') as file:
+            for line in file:
+                url_list.append(line.strip())
 
-        runway_information = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'pageTitle'))).text.split(' - ')
-        designer = runway_information[0]
-        album = runway_information[2]
-        gender = runway_information[3]
-        season = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'season'))).text.replace(' / ', ' ')
-        total_images = int(wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'info'))).text.split(' ')[0])
+        downloads: Path = Path('Downloads')
+        downloads.mkdir(exist_ok = True)
+    
+        timeout = aiohttp.ClientTimeout(total = 60)
+        connector = aiohttp.TCPConnector(limit = 100, limit_per_host = 10, force_close = True)
+        headers   = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)…',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': page.url,
+        }
+        async with aiohttp.ClientSession(connector = connector, timeout = timeout, headers = headers) as session:
+            for url in url_list:
+                await page.goto(url)
 
-        if not os.path.exists(designer):
-            os.makedirs(designer)
-        os.chdir(designer)
+                raw_title = await page.locator('.pageTitle').text_content()
+                runway_information = raw_title.split(' - ')
+                designer = runway_information[0]
+                album = runway_information[2].rstrip()
+                gender = runway_information[3]
 
-        if not os.path.exists(gender):
-            os.makedirs(gender)
-        os.chdir(gender)
+                raw_season = await page.locator('.season').text_content()
+                season = raw_season.replace(' / ', ' ')
+                
+                raw_total_images = await page.locator('.info').text_content()
+                total_images = int(raw_total_images.split(' ')[0])
 
-        if not os.path.exists(season):
-            os.makedirs(season)
-        os.chdir(season)
+                runway_directory: Path = downloads / designer / gender/ season / album
+                runway_directory.mkdir(parents = True, exist_ok = True)
+                
+                print(f'Downloading {total_images} images from {designer} {gender} {season} {album}')
+                await get_images(session, page, runway_directory, total_images)
 
-        if not os.path.exists(album):
-            os.makedirs(album)
-        else:
-            os.chdir('../../..')
-            continue
-
-        get_images(driver, url, album, total_images)
-        os.chdir('../../..')
-
-    driver.quit()
+        await browser.close()
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
