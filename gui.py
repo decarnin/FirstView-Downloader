@@ -1,3 +1,4 @@
+import os
 import sys
 import asyncio
 from pathlib import Path
@@ -5,7 +6,7 @@ from typing import List, Tuple, Dict, Union
 import requests
 from bs4 import BeautifulSoup
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QTextEdit, QLineEdit, QPushButton, QFileDialog, QProgressBar, QSizePolicy
-from PySide6.QtGui import QPalette, QColor, QCursor
+from PySide6.QtGui import QPalette, QColor, QCursor, QIcon
 from PySide6.QtCore import Qt, QTimer, QThread, Signal, QMimeData
 from downloader import main as download_main
 
@@ -41,6 +42,13 @@ COMMON_CSS = '''
         color: rgb(160,160,160);
     }
 '''
+
+def icon_path(icon_path: str) -> str:
+    if getattr(sys, 'frozen', False):
+        base_path: str = sys._MEIPASS
+    else:
+        base_path: str = os.path.abspath('.')
+    return os.path.join(base_path, icon_path)
 
 class PasteEdit(QTextEdit):
     def insertFromMimeData(self, source: QMimeData) -> None:
@@ -118,7 +126,7 @@ class DownloadWorker(QThread):
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle('First View Downloader')
+        self.setWindowTitle('FirstView Downloader')
         self.resize(900, 600)
         self.setMinimumSize(900, 600)
         self.setDarkTheme()
@@ -197,7 +205,7 @@ class MainWindow(QMainWindow):
         # Download path changer
         path_layout = QHBoxLayout()
         download_label = QLabel('Download Path:')
-        default_path = Path.home() / 'Downloads' / 'Firstview'
+        default_path = Path.home() / 'Downloads' / 'FirstView'
         default_path.mkdir(parents = True, exist_ok = True)
         self.path_edit = QLineEdit(str(default_path))
         change_button = QPushButton('Change')
@@ -322,6 +330,10 @@ class MainWindow(QMainWindow):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
+    icon_file : str = icon_path('fv.ico')
+    app.setWindowIcon(QIcon(icon_path('fv.ico')))
     window = MainWindow()
+    window.setWindowIcon(QIcon(icon_file))
+    window.setWindowIconText('FirstView Downloader')
     window.show()
     sys.exit(app.exec())
