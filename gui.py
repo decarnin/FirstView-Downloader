@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QTextEdit, QLineEdit, QPushButton, QFileDialog, QProgressBar, QSizePolicy
 from PySide6.QtGui import QPalette, QColor, QCursor
 from PySide6.QtCore import Qt, QTimer, QThread, Signal, QMimeData
-from firstview_downloader import main as download_main
+from downloader import main as download_main
 
 # Common stylesheet applied to text and button widgets throughout the app
 COMMON_CSS = '''
