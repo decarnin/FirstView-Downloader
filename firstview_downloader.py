@@ -7,6 +7,7 @@ from urllib.parse import urljoin
 import os
 import io
 from PIL import Image
+from typing import Callable
 
 async def download_image(session: aiohttp.ClientSession, url: str, download_path: Path, file_name: str) -> None:
     try:
@@ -31,7 +32,7 @@ async def get_thumbnails(page: Page, total_images: int) -> list[str]:
 
     return thumbnail_list
 
-async def get_images(session: aiohttp.ClientSession, page: Page, download_path: Path, total_images: int) -> None:
+async def get_images(session: aiohttp.ClientSession, page: Page, download_path: Path, total_images: int, status_callback: Callable[[str], None], label: str) -> None:
     BASE = 'https://www.firstview.com'
     download_path.mkdir(parents = True, exist_ok = True)
     thumbnail_list = await get_thumbnails(page, total_images)
@@ -52,19 +53,23 @@ async def get_images(session: aiohttp.ClientSession, page: Page, download_path: 
         download_url = prefix + middle + thumbnail_url[-len(suffix):]
         image_urls.append(download_url)
 
-    tasks = [download_image(session, url, download_path, f'{i}.jpg') for i, url in enumerate(image_urls, start = 1)]
-    await asyncio.gather(*tasks)
+    futures: dict[asyncio.Task, int] = {}
+    for i, url in enumerate(image_urls, start = 1):
+        task = asyncio.create_task(download_image(session, url, download_path, f'{i}.jpg'))
+        futures[task] = i
 
-async def main() -> None:
+    downloaded_images = 0
+    # as each download finishes, emit a PROGRESS update
+    for task in asyncio.as_completed(futures):
+        await task
+        downloaded_images += 1
+        status_callback(f'PROGRESS:{label}:{downloaded_images}:{total_images}')
+
+async def main(url_list: list[str], base_path: Path, status_callback: Callable[[str], None]) -> None:
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless = True)
         context = await browser.new_context()
         page = await context.new_page()
-
-        url_list: list[str] = []
-        with open('config.txt') as file:
-            for line in file:
-                url_list.append(line.strip())
 
         firstview: Path = Path.home() / 'Downloads' / 'FirstView'
     
@@ -94,8 +99,8 @@ async def main() -> None:
                 runway_directory: Path = firstview / designer / gender/ season / album
                 runway_directory.mkdir(parents = True, exist_ok = True)
                 
-                print(f'Downloading {total_images} images from {designer} {gender} {season} {album}')
-                await get_images(session, page, runway_directory, total_images)
+                label = f'{designer} - {gender} - {raw_season} - {album}'
+                await get_images(session, page, runway_directory, total_images, status_callback, label)
 
         await browser.close()
 
