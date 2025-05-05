@@ -67,7 +67,6 @@ async def main() -> None:
                 url_list.append(line.strip())
 
         firstview: Path = Path.home() / 'Downloads' / 'FirstView'
-        firstview.mkdir(exist_ok = True)
     
         timeout = aiohttp.ClientTimeout(total = 60)
         connector = aiohttp.TCPConnector(limit = 100, limit_per_host = 10, force_close = True)
