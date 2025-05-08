@@ -25,4 +25,4 @@ A simple Windows application for bulk‑downloading runway collection images fro
 - PySide6  
 
 ## Acknowledgements
-Fish icon by [Icons8](https://icons8.com/icons/fish), licensed under [CC BY‑ND 3.0](https://creativecommons.org/licenses/by-nd/3.0/).
+Fish icon by [Icons8](https://icons8.com/), licensed under [CC BY‑ND 3.0](https://creativecommons.org/licenses/by-nd/3.0/).
