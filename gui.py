@@ -70,7 +70,7 @@ def fetch_runway_metadata(url: str) -> Tuple[str, str, str, str]:
 
     raw_title = soup.select_one('.pageTitle').get_text(strip = True)
     designer, _, album, gender = raw_title.split(' - ')
-    
+
     season = soup.select_one('.season').get_text(strip = True)
 
     return designer, gender, season, album
@@ -261,12 +261,12 @@ class MainWindow(QMainWindow):
         if not self._has_invalid:
             self.download_button.setEnabled(True)
 
-    def on_preview_result(self, url: str, res: Union[Tuple[str, str, str, str], str]) -> None:
-        if res == 'invalid' or isinstance(res, Exception):
+    def on_preview_result(self, url: str, result: Union[Tuple[str, str, str, str], str]) -> None:
+        if result == 'invalid' or isinstance(result, Exception):
             self.preview_text.append(f'Invalid URL: {url}')
             self._has_invalid = True
         else:
-            designer, gender, season, album = res
+            designer, gender, season, album = result
             self.preview_text.append(f'{designer} - {gender} - {season} - {album}')
 
     def download(self) -> None:
