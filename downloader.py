@@ -65,9 +65,9 @@ async def get_images(session: aiohttp.ClientSession, page: Page, download_path: 
         downloaded_images += 1
         status_callback(f'PROGRESS:{label}:{downloaded_images}:{total_images}')
 
-async def main(url_list: list[str], base_path: Path, status_callback: Callable[[str], None]) -> None:
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless = True)
+async def main(url_list: list[str], status_callback: Callable[[str], None]) -> None:
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless = True)
         context = await browser.new_context()
         page = await context.new_page()
 
@@ -85,10 +85,9 @@ async def main(url_list: list[str], base_path: Path, status_callback: Callable[[
                 await page.goto(url)
 
                 raw_title = await page.locator('.pageTitle').text_content()
-                runway_information = raw_title.split(' - ')
-                designer = runway_information[0]
-                album = runway_information[2].rstrip()
-                gender = runway_information[3]
+
+                designer, _, album, gender = raw_title.split(' - ')
+                album = album.rstrip() # Remove trailing whitespace since it causes issues with directory creation
 
                 raw_season = await page.locator('.season').text_content()
                 season = raw_season.replace(' / ', ' ')

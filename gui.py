@@ -69,11 +69,8 @@ def fetch_runway_metadata(url: str) -> Tuple[str, str, str, str]:
     soup = BeautifulSoup(response.text, 'html.parser')
 
     raw_title = soup.select_one('.pageTitle').get_text(strip = True)
-    runway_information = raw_title.split(' - ')
-    designer = runway_information[0]
-    album = runway_information[2]
-    gender = runway_information[3]
-
+    designer, _, album, gender = raw_title.split(' - ')
+    
     season = soup.select_one('.season').get_text(strip = True)
 
     return designer, gender, season, album
@@ -248,10 +245,13 @@ class MainWindow(QMainWindow):
         self.preview_text.clear()
         self._has_invalid = False
         self.download_button.setEnabled(False)
+
         if not urls:
             return
+        
         if hasattr(self, 'preview_worker') and self.preview_worker.isRunning():
             self.preview_worker.stop()
+            
         self.preview_worker = PreviewWorker(urls, self.preview_cache)
         self.preview_worker.preview_result.connect(self.on_preview_result)
         self.preview_worker.finished.connect(self.on_preview_loaded)
@@ -300,7 +300,7 @@ class MainWindow(QMainWindow):
             self.preview_text.append(message)
             return
 
-        _, label, currently_downloaded, total_images = message.split(':', 3)
+        _, label, currently_downloaded, total_images = message.split(':')
         current = int(currently_downloaded)
         total = int(total_images)
 
