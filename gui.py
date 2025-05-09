@@ -10,13 +10,15 @@ from typing import List, Tuple, Dict, Union
 import requests
 from bs4 import BeautifulSoup
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QTextEdit, QLineEdit, QPushButton, QFileDialog, QProgressBar, QSizePolicy
-from PySide6.QtGui import QPalette, QColor, QCursor, QIcon
+from PySide6.QtGui import QPalette, QColor, QCursor, QIcon, QFont
 from PySide6.QtCore import Qt, QTimer, QThread, Signal, QMimeData
 from downloader import main as download_main
 
 # Common stylesheet applied to text and button widgets throughout the app
 COMMON_CSS = '''
     QTextEdit, QLineEdit {
+        font-family: 'Segoe UI';
+        font-size: 9pt;
         border: 1px solid #353535;
         border-radius: 4px;
         selection-background-color: rgb(76, 194, 255);
@@ -55,10 +57,16 @@ def icon_path(icon_path: str) -> str:
     return os.path.join(base_path, icon_path)
 
 class PasteEdit(QTextEdit):
+    def __init__(self):
+        super().__init__()
+        self.setFont(QFont("Segoe UI", 9))
+        self.setAcceptRichText(False)
+
     def insertFromMimeData(self, source: QMimeData) -> None:
         cursor = self.textCursor()
         cursor.beginEditBlock()
-        super().insertFromMimeData(source)
+        plain_text = source.text()
+        cursor.insertText(plain_text)
         cursor.insertText('\n')
         cursor.endEditBlock()
 
@@ -100,7 +108,6 @@ class PreviewWorker(QThread):
                 except Exception:
                     self.preview_result.emit(url, 'invalid')
                     continue
-            self.preview_result.emit(url, result)
 
     def stop(self) -> None:
         self._isRunning = False
