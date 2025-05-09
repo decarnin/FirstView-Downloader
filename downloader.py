@@ -65,13 +65,11 @@ async def get_images(session: aiohttp.ClientSession, page: Page, download_path: 
         downloaded_images += 1
         status_callback(f'PROGRESS:{label}:{downloaded_images}:{total_images}')
 
-async def main(url_list: list[str], status_callback: Callable[[str], None]) -> None:
+async def main(url_list: list[str], download_path: Path, status_callback: Callable[[str], None]) -> None:
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless = True)
         context = await browser.new_context()
         page = await context.new_page()
-
-        firstview: Path = Path.home() / 'Downloads' / 'FirstView'
     
         timeout = aiohttp.ClientTimeout(total = 60)
         connector = aiohttp.TCPConnector(limit = 100, limit_per_host = 10, force_close = True)
@@ -87,7 +85,7 @@ async def main(url_list: list[str], status_callback: Callable[[str], None]) -> N
                 raw_title = await page.locator('.pageTitle').text_content()
 
                 designer, _, album, gender = raw_title.split(' - ')
-                album = album.rstrip() # Remove trailing whitespace since it causes issues with directory creation
+                album = album.rstrip()
 
                 raw_season = await page.locator('.season').text_content()
                 season = raw_season.replace(' / ', ' ')
@@ -95,7 +93,7 @@ async def main(url_list: list[str], status_callback: Callable[[str], None]) -> N
                 raw_total_images = await page.locator('.info').text_content()
                 total_images = int(raw_total_images.split(' ')[0])
 
-                runway_directory: Path = firstview / designer / gender/ season / album
+                runway_directory: Path = download_path / designer / gender/ season / album
                 runway_directory.mkdir(parents = True, exist_ok = True)
                 
                 label = f'{designer} - {gender} - {raw_season} - {album}'
