@@ -66,8 +66,7 @@ class PasteEdit(QTextEdit):
         cursor = self.textCursor()
         cursor.beginEditBlock()
         plain_text = source.text()
-        cursor.insertText(plain_text)
-        cursor.insertText('\n')
+        cursor.insertText(plain_text + '\n')
         cursor.endEditBlock()
 
 def fetch_runway_metadata(url: str) -> Tuple[str, str, str, str]:
@@ -108,6 +107,7 @@ class PreviewWorker(QThread):
                 except Exception:
                     self.preview_result.emit(url, 'invalid')
                     continue
+            self.preview_result.emit(url, result)
 
     def stop(self) -> None:
         self._isRunning = False
@@ -256,8 +256,9 @@ class MainWindow(QMainWindow):
         if not urls:
             return
         
-        if hasattr(self, 'preview_worker') and self.preview_worker.isRunning():
+        if hasattr(self, 'preview_worker') and self.preview_worker.isRunning(): # ensure that the previous worker is stopped, is this potentially causing crashes?
             self.preview_worker.stop()
+            self.preview_worker.wait()
             
         self.preview_worker = PreviewWorker(urls, self.preview_cache)
         self.preview_worker.preview_result.connect(self.on_preview_result)
