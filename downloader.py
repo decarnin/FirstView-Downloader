@@ -23,18 +23,25 @@ async def download_image(session: aiohttp.ClientSession, url: str, download_path
 
 async def get_thumbnails(page: Page, total_images: int) -> list[str]:
     thumbnail_list: list[str] = []
+    locator = page.locator('.picture')
+
+    while True:
+        available: int = await locator.count()
+        if available >= total_images:
+            break
+        await page.mouse.wheel(0, 2000)
+        await asyncio.sleep(1)
 
     for i in range(total_images):
-        thumbnail = page.locator('.picture').nth(i)
-        thumbnail_url = await thumbnail.get_attribute('src')
-        thumbnail_list.append(thumbnail_url)
-        await thumbnail.scroll_into_view_if_needed()
+        thumb_locator = locator.nth(i)
+        await thumb_locator.scroll_into_view_if_needed()
+        url: str = await thumb_locator.get_attribute('src')
+        thumbnail_list.append(url)
 
     return thumbnail_list
 
 async def get_images(session: aiohttp.ClientSession, page: Page, download_path: Path, total_images: int, status_callback: Callable[[str], None], label: str) -> None:
     BASE = 'https://www.firstview.com'
-    download_path.mkdir(parents = True, exist_ok = True)
     thumbnail_list = await get_thumbnails(page, total_images)
     first_thumbnail = urljoin(BASE, thumbnail_list[0])
 

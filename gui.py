@@ -213,8 +213,7 @@ class MainWindow(QMainWindow):
         # Download path changer
         path_layout = QHBoxLayout()
         download_label = QLabel('Download Path:')
-        default_path = Path.home() / 'Downloads' / 'FirstView'
-        default_path.mkdir(parents = True, exist_ok = True)
+        default_path = Path.home() / 'Pictures'
         self.path_edit = QLineEdit(str(default_path))
         change_button = QPushButton('Change')
         change_button.setFixedWidth(100)
@@ -282,7 +281,10 @@ class MainWindow(QMainWindow):
         if not urls or self._has_invalid:
             return
 
-        download_path = Path(self.path_edit.text())
+        self.preview_text.append('Loading Images...')
+
+        base_path = Path(self.path_edit.text())
+        download_path = base_path / 'FirstView'
         download_path.mkdir(parents = True, exist_ok = True)
 
         # Clear existing progress widgets
