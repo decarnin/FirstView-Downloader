@@ -387,7 +387,7 @@ class MainWindow(QMainWindow):
             designer, gender, season, album = result
             parts = [p for p in [designer, gender, season, album] if p]
             display = ' / '.join(parts) if parts else url
-            self.preview_text.append(f'<span style="color: {COLORS["success"]};">✓</span> {display}')
+            self.preview_text.append(display)
 
     def download(self) -> None:
         urls = [url.strip() for url in self.paste_text.toPlainText().splitlines() if url.strip()]
@@ -395,7 +395,14 @@ class MainWindow(QMainWindow):
             return
 
         base_path = Path(self.path_edit.text())
-        download_path = base_path / 'FirstView'
+
+        # Check if already in a FirstView folder structure
+        path_parts = [p.lower() for p in base_path.parts]
+        if 'firstview' in path_parts:
+            download_path = base_path
+        else:
+            download_path = base_path / 'FirstView'
+
         download_path.mkdir(parents=True, exist_ok=True)
 
         # Clear progress

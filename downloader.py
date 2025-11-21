@@ -9,17 +9,27 @@ import io
 from PIL import Image
 from typing import Callable
 
-async def download_image(session: aiohttp.ClientSession, url: str, download_path: Path, file_name: str) -> None:
-    try:
-        async with session.get(url) as response:
-            response.raise_for_status() # Checks if the response is in the error range (4xx or 5xx) and raises an exception
-            data = await response.read()
-            image = Image.open(io.BytesIO(data))
-            if image.mode != 'RGB':
-                image = image.convert('RGB')
-            image.save(download_path / file_name, format = 'JPEG')
-    except Exception as e:
-        print(f'Error downloading image {url}: {e}')
+async def download_image(session: aiohttp.ClientSession, url: str, download_path: Path, file_name: str, max_retries: int = 3) -> None:
+    for attempt in range(max_retries):
+        try:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                data = await response.read()
+                image = Image.open(io.BytesIO(data))
+                if image.mode != 'RGB':
+                    image = image.convert('RGB')
+                image.save(download_path / file_name, format='JPEG')
+                return  # Success, exit function
+        except (aiohttp.ClientError, OSError) as e:
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 5  # 5s, 10s, 15s
+                print(f'Connection error for {url}, retrying in {wait_time}s... ({attempt + 1}/{max_retries})')
+                await asyncio.sleep(wait_time)
+            else:
+                print(f'Error downloading image {url} after {max_retries} attempts: {e}')
+        except Exception as e:
+            print(f'Error downloading image {url}: {e}')
+            return
 
 async def get_thumbnails(page: Page, total_images: int) -> list[str]:
     thumbnail_list: list[str] = []
@@ -100,7 +110,14 @@ async def main(url_list: list[str], download_path: Path, status_callback: Callab
                 raw_total_images = await page.locator('.info').text_content()
                 total_images = int(raw_total_images.split(' ')[0])
 
-                runway_directory: Path = download_path / designer / gender/ season / album
+                # Build path, skipping components already in the path
+                path_parts_lower = [p.lower() for p in download_path.parts]
+                runway_directory = download_path
+
+                for component in [designer, gender, season, album]:
+                    if component.lower() not in path_parts_lower:
+                        runway_directory = runway_directory / component
+
                 runway_directory.mkdir(parents = True, exist_ok = True)
                 
                 label = f'{designer} - {gender} - {raw_season} - {album}'
